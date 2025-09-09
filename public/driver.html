@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Driver Tracker</title>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+      import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js";
+
+      const firebaseConfig = {
+  apiKey: "AIzaSyCLQsl2qEIhEC7_GHeggzkbTa5QH48-_Ww",
+  authDomain: "realtime-location-tracke-5e9a7.firebaseapp.com",
+  databaseURL: "https://realtime-location-tracke-5e9a7-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "realtime-location-tracke-5e9a7",
+  storageBucket: "realtime-location-tracke-5e9a7.firebasestorage.app",
+  messagingSenderId: "307624403558",
+  appId: "1:307624403558:web:c1ce67a5ae3ee97e40c3a7",
+  measurementId: "G-PCVFG0BGGL"
+};
+
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
+
+      function updateLocation(lat, lng) {
+        set(ref(db, "bus/location"), {
+          lat,
+          lng,
+          timestamp: Date.now()
+        });
+      }
+
+      if (navigator.geolocation) {
+        navigator.geolocation.watchPosition(
+          (pos) => {
+            updateLocation(pos.coords.latitude, pos.coords.longitude);
+          },
+          (err) => console.error(err),
+          { enableHighAccuracy: true }
+        );
+      } else {
+        alert("Geolocation not supported on this device.");
+      }
+    </script>
+  </head>
+  <body>
+    <h2>Driver tracking active 🚍</h2>
+  </body>
+</html>
