@@ -1,8 +1,6 @@
-// src/firebaseConfig.js
 import { initializeApp } from "firebase/app";
 import { getDatabase } from "firebase/database";
 
-// Your Firebase project config (from the console)
 const firebaseConfig = {
   apiKey: "AIzaSyCLQsl2qEIhEC7_GHeggzkbTa5QH48-_Ww",
   authDomain: "realtime-location-tracke-5e9a7.firebaseapp.com",
@@ -14,8 +12,5 @@ const firebaseConfig = {
   measurementId: "G-PCVFG0BGGL"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
-
-

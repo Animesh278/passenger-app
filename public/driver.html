@@ -1,12 +1,28 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-  <head>
-    <title>Driver Tracker</title>
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
-      import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-database.js";
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Driver Tracker</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 14px; max-width: 520px; margin:auto;}
+    button { padding: 10px 14px; font-size: 16px; }
+    #status { margin-top: 12px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h2>Driver Location Sender</h2>
+  <label>Bus ID: <input id="busId" value="bus1" /></label><br/>
+  <label>Route: <input id="route" value="Route A" /></label><br/>
+  <button id="startBtn">Start Tracking</button>
+  <button id="stopBtn" disabled>Stop</button>
+  <p id="status">Status: Idle</p>
 
-      const firebaseConfig = {
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+    const firebaseConfig = {
   apiKey: "AIzaSyCLQsl2qEIhEC7_GHeggzkbTa5QH48-_Ww",
   authDomain: "realtime-location-tracke-5e9a7.firebaseapp.com",
   databaseURL: "https://realtime-location-tracke-5e9a7-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -16,32 +32,100 @@
   appId: "1:307624403558:web:c1ce67a5ae3ee97e40c3a7",
   measurementId: "G-PCVFG0BGGL"
 };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-      const app = initializeApp(firebaseConfig);
-      const db = getDatabase(app);
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const statusEl = document.getElementById("status");
+    const busInput = document.getElementById("busId");
+    const routeInput = document.getElementById("route");
 
-      function updateLocation(lat, lng) {
-        set(ref(db, "bus/location"), {
-          lat,
-          lng,
-          timestamp: Date.now()
-        });
+    let watchId = null;
+    let lastSent = 0;
+    const MIN_INTERVAL_MS = 3000; 
+
+    function pushPending(payload) {
+      const arr = JSON.parse(localStorage.getItem("pendingLocations") || "[]");
+      arr.push(payload);
+      localStorage.setItem("pendingLocations", JSON.stringify(arr));
+    }
+
+    async function flushPending() {
+      const arr = JSON.parse(localStorage.getItem("pendingLocations") || "[]");
+      while (arr.length) {
+        const item = arr.shift();
+        try {
+          await set(ref(db, `buses/${item.busId}`), item.data);
+        } catch (e) {
+
+          arr.unshift(item);
+          break;
+        }
+      }
+      localStorage.setItem("pendingLocations", JSON.stringify(arr));
+    }
+
+    async function writeLocation(busId, routeName, lat, lng) {
+      const payload = {
+        meta: { route: routeName, id: busId },
+        location: { lat, lng, timestamp: Date.now() }
+      };
+
+      if (!navigator.onLine) {
+        pushPending({ busId, data: payload });
+        return false;
       }
 
-      if (navigator.geolocation) {
-        navigator.geolocation.watchPosition(
-          (pos) => {
-            updateLocation(pos.coords.latitude, pos.coords.longitude);
-          },
-          (err) => console.error(err),
-          { enableHighAccuracy: true }
-        );
-      } else {
-        alert("Geolocation not supported on this device.");
+      try {
+        await set(ref(db, `buses/${busId}`), payload);
+
+        flushPending();
+        return true;
+      } catch (err) {
+        
+        pushPending({ busId, data: payload });
+        return false;
       }
-    </script>
-  </head>
-  <body>
-    <h2>Driver tracking active 🚍</h2>
-  </body>
+    }
+
+    startBtn.addEventListener("click", () => {
+      const busId = (busInput.value || "bus1").trim();
+      const routeName = (routeInput.value || "Route").trim();
+      if (!navigator.geolocation) { alert("Geolocation not supported"); return; }
+      if (watchId !== null) { statusEl.innerText = "Already tracking"; return; }
+
+      watchId = navigator.geolocation.watchPosition(async (pos) => {
+        const now = Date.now();
+        if (now - lastSent < MIN_INTERVAL_MS) return;
+        lastSent = now;
+
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const ok = await writeLocation(busId, routeName, lat, lng);
+        statusEl.innerText = `Updated ${busId}: ${lat.toFixed(6)}, ${lng.toFixed(6)} — ${ok ? "OK" : "QUEUED"}`;
+      }, (err) => {
+        statusEl.innerText = `GPS error: ${err.message || err}`;
+      }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
+
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      statusEl.innerText = "Tracking started — allow location permission";
+    });
+
+    stopBtn.addEventListener("click", () => {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      startBtn.disabled = false;
+      stopBtn.disabled = true;
+      statusEl.innerText = "Tracking stopped";
+    });
+
+
+    window.addEventListener("online", () => {
+      flushPending();
+      statusEl.innerText = "Back online — flushing queued updates";
+    });
+  </script>
+</body>
 </html>

@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "firebase": "^12.2.1",
+    "geolib": "^3.3.4",
     "leaflet": "^1.9.4",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
